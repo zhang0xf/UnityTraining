@@ -14,6 +14,7 @@ public class CustomRenderPipeline : RenderPipeline
         this.useGPUInstancing = useGPUInstancing;
         // 当Shader兼容(Compatible)渲染管线批处理(SRP Batcher)时,开启SRP Batching才有效果.[Shader是否兼容批处理可由Shader的Inspector面板查看]
         GraphicsSettings.useScriptableRenderPipelineBatching = useSRPBatcher;
+        GraphicsSettings.lightsUseLinearIntensity = true; // 光线颜色转换到线性空间(linear space)
         renderer = new CameraRenderer();
     }
 

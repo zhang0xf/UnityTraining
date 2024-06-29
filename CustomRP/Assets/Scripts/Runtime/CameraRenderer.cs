@@ -7,17 +7,20 @@ public partial class CameraRenderer
 
     private ScriptableRenderContext context;
     private Camera camera;
-    private CommandBuffer buffer;
+    private readonly CommandBuffer buffer;
     private CullingResults cullingResults;
+    private readonly Lighting lighting;
 
-    private static ShaderTagId unlitShaderTagId = new ShaderTagId("SRPDefaultUnlit"); // SRPDefaultUnlit pass
-
+    private static ShaderTagId unlitShaderTagId = new ShaderTagId("SRPDefaultUnlit"); // SRPDefaultUnlit pass(SRP默认渲染通道)
+    private static ShaderTagId litShaderTagId = new ShaderTagId("CustomLit"); // CustomLit pass(渲染通道)
     public CameraRenderer()
     {
         buffer = new CommandBuffer
         {
             name = bufferName
         };
+
+        lighting = new Lighting();
     }
 
     public void Render(ScriptableRenderContext context, Camera camera, bool useDynamicBatching, bool useGPUInstancing)
@@ -43,8 +46,10 @@ public partial class CameraRenderer
         CameraClearFlags flags = camera.clearFlags;
         buffer.ClearRenderTarget(flags <= CameraClearFlags.Depth, flags <= CameraClearFlags.Color,
             flags == CameraClearFlags.Color ? camera.backgroundColor.linear : Color.clear);
-        buffer.BeginSample(SampleName);
+        buffer.BeginSample(SampleName); // 优化调试
         ExecuteBuffer();
+
+        lighting.Setup(context, cullingResults);
 
         DrawVisibleGeometry(useDynamicBatching, useGPUInstancing);
         DrawUnsupportedShaders();
@@ -69,6 +74,7 @@ public partial class CameraRenderer
         var drawingSettings = new DrawingSettings(unlitShaderTagId, sortingSettings);
         drawingSettings.enableDynamicBatching = useDynamicBatching;
         drawingSettings.enableInstancing = useGPUInstancing;
+        drawingSettings.SetShaderPassName(1, litShaderTagId); // 添加渲染通道
         var filteringSettings = new FilteringSettings(RenderQueueRange.opaque);
         context.DrawRenderers(cullingResults, ref drawingSettings, ref filteringSettings);
 

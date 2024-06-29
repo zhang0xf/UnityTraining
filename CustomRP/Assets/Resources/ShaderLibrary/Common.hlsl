@@ -3,6 +3,8 @@
 
 // real4本身不是一个合法的类型,根据目标平台不同,它可能是float4或half4的别名,所以需要通过'Common.hlsl'引入这些定义.
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+// 计算粗糙度的函数'PerceptualSmoothnessToPerceptualRoughness'等定义在此文件中(另见:BRDF.hlsl).
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/CommonMaterial.hlsl"
 #include "UnityInput.hlsl"
 
 #define UNITY_MATRIX_M unity_ObjectToWorld // 'SpaceTransforms.hlsl'只能识别'UNITY_MATRIX_M'.
@@ -18,6 +20,10 @@
 // 'UnityInstancing.hlsl'提供了宏(另见'UNITY_VERTEX_INPUT_INSTANCE_ID')可以简化这一操作.但是它需要顶点着色器(vertex function)有一个struct参数.
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/UnityInstancing.hlsl"
 // 'SpaceTransforms.hlsl'包含许多常用的函数和其他,例如'TransformObjectToWorld'转换函数.因此我们无需重复实现.[需要安装Package]
-#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/SpaceTransforms.hlsl" 
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/SpaceTransforms.hlsl"
+
+float Square (float v) {
+	return v * v;
+}
 	
 #endif

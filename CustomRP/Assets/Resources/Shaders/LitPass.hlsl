@@ -3,6 +3,7 @@
 
 #include "../ShaderLibrary/Common.hlsl"
 #include "../ShaderLibrary/Surface.hlsl"
+#include "../ShaderLibrary/Shadows.hlsl"
 #include "../ShaderLibrary/Light.hlsl"
 #include "../ShaderLibrary/BRDF.hlsl"
 #include "../ShaderLibrary/Lighting.hlsl"
@@ -37,14 +38,13 @@ struct Attributes {
 };
 
 struct Varyings {
-	float4 positionCS : SV_POSITION; // Homogeneous Clip Space Position.
+	float4 positionCS : SV_POSITION; // Homogeneous Clip Space Position(齐次裁剪空间).
     float3 positionWS : VAR_POSITION; // World Space Surface Position.
     float3 normalWS : VAR_NORMAL; // 照明是逐片元计算的,所以片元函数需要法线信息.并且通常在世界空间(world space)中计算.
     float2 baseUV : VAR_BASE_UV; // 该变量用于传递纹理坐标,'VAR_BASE_UV'不是特定语义,而是任意未使用的标识符,用来赋予变量含义.
 	UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
-// 返回值类型float4:向量(x,y,z,w),被定义为齐次裁剪空间(homogeneous clip space)中的坐标.
 Varyings LitPassVertex(Attributes input)
 {
     Varyings output;
@@ -74,12 +74,16 @@ float4 LitPassFragment(Varyings input) : SV_TARGET
     #endif
 
     Surface surface;
+    surface.position = input.positionWS;
 	surface.normal = normalize(input.normalWS); // normalize:跨三角形的线性插值会影响法线的长度,使之不再是单位长度,所以需要归一化.
 	surface.viewDirection = normalize(_WorldSpaceCameraPos - input.positionWS);
+    surface.depth = -TransformWorldToView(input.positionWS).z; // 'world space'转换到'view space'.
     surface.color = base.rgb;
 	surface.alpha = base.a;
     surface.metallic = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _Metallic);
 	surface.smoothness = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _Smoothness);
+    // 给定屏幕空间xy坐标,生成一个旋转的抖动模式的贴片(a rotated tiled dither pattern)
+    surface.dither = InterleavedGradientNoise(input.positionCS.xy, 0);
 
     #if defined(_PREMULTIPLY_ALPHA)
 		BRDF brdf = GetBRDF(surface, true);

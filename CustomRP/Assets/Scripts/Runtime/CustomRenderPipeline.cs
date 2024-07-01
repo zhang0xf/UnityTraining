@@ -5,13 +5,15 @@ using UnityEngine.Rendering;
 public class CustomRenderPipeline : RenderPipeline
 {
     private readonly CameraRenderer renderer;
-    private bool useDynamicBatching;
-    private bool useGPUInstancing;
+    private readonly bool useDynamicBatching;
+    private readonly bool useGPUInstancing;
+    private readonly ShadowSettings shadowSettings;
 
-    public CustomRenderPipeline(bool useDynamicBatching, bool useGPUInstancing, bool useSRPBatcher)
+    public CustomRenderPipeline(bool useDynamicBatching, bool useGPUInstancing, bool useSRPBatcher, ShadowSettings shadowSettings)
     {
         this.useDynamicBatching = useDynamicBatching;
         this.useGPUInstancing = useGPUInstancing;
+        this.shadowSettings = shadowSettings;
         // 当Shader兼容(Compatible)渲染管线批处理(SRP Batcher)时,开启SRP Batching才有效果.[Shader是否兼容批处理可由Shader的Inspector面板查看]
         GraphicsSettings.useScriptableRenderPipelineBatching = useSRPBatcher;
         GraphicsSettings.lightsUseLinearIntensity = true; // 光线颜色转换到线性空间(linear space)
@@ -19,7 +21,10 @@ public class CustomRenderPipeline : RenderPipeline
     }
 
 
-    protected override void Render(ScriptableRenderContext context, Camera[] cameras) { }
+    protected override void Render(ScriptableRenderContext context, Camera[] cameras)
+    {
+
+    }
 
     protected override void Render(ScriptableRenderContext context, List<Camera> cameras)
     {
@@ -28,7 +33,7 @@ public class CustomRenderPipeline : RenderPipeline
             // 支持每个摄像机使用不同的渲染方法,
             // 例如:一个相机负责第一人称视角,另一个相机负责3D地图;
             // 例如:一个相机使用forward rendering,另一个相机使用deferred rendering.
-            renderer.Render(context, cameras[i], useDynamicBatching, useGPUInstancing);
+            renderer.Render(context, cameras[i], useDynamicBatching, useGPUInstancing, shadowSettings);
         }
     }
 }

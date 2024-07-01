@@ -3,7 +3,7 @@ using UnityEngine;
 public class MeshBall : MonoBehaviour
 {
     [SerializeField] private Mesh mesh = default;
-    [SerializeField] private Material unlitMaterial = default;
+    // [SerializeField] private Material unlitMaterial = default;
     [SerializeField] private Material litMaterial = default;
 
     private readonly Matrix4x4[] matrices = new Matrix4x4[1023];

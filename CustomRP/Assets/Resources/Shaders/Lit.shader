@@ -5,6 +5,8 @@ Shader "Custom RP/Lit" {
         _BaseColor("Color", Color) = (0.5, 0.5, 0.5, 1.0) // 灰色
         _Cutoff ("Alpha Cutoff", Range(0.0, 1.0)) = 0.5 // Alpha剔除阈值
         [Toggle(_CLIPPING)] _Clipping ("Alpha Clipping", Float) = 0
+        [Toggle(_RECEIVE_SHADOWS)] _ReceiveShadows ("Receive Shadows", Float) = 1 // 是否接受阴影
+        [KeywordEnum(On, Clip, Dither, Off)] _Shadows ("Shadows", Float) = 0 // 是否投射阴影
         _Metallic ("Metallic", Range(0, 1)) = 0
 		_Smoothness ("Smoothness", Range(0, 1)) = 0.5
         [Toggle(_PREMULTIPLY_ALPHA)] _PremulAlpha ("Premultiply Alpha", Float) = 0
@@ -35,8 +37,15 @@ Shader "Custom RP/Lit" {
             #pragma target 3.5 
             // 启动toggle会向'Material'的'active keywords'列表中添加'_CLIPPING keyword'.禁用toggle则会移除它.
             // 该指令告诉Unity根据关键字(keyword)是否定义编译不同版本的着色器(Shader).
-            #pragma shader_feature _CLIPPING
+            // #pragma shader_feature _CLIPPING
+            // 没有关键字的情况使用下划线(_)表示,即默认表示On和Off.(注意On或者Off是通过'CustomShaderGUI'中启用或禁用'ShadowCaster pass'来实现,才会出现这里默认状态包含On/Off两种状态的情况)
+            #pragma shader_feature _ _SHADOWS_CLIP _SHADOWS_DITHER
+            #pragma shader_feature _RECEIVE_SHADOWS
             #pragma shader_feature _PREMULTIPLY_ALPHA
+            // 该指令告诉Unity根据过滤器模式关键字编译不同版本的着色器(Shader).
+            // 没有关键字的情况使用下划线(_)表示,即匹配默认的'2×2 filter'.
+            #pragma multi_compile _ _DIRECTIONAL_PCF3 _DIRECTIONAL_PCF5 _DIRECTIONAL_PCF7
+            #pragma multi_compile _ _CASCADE_BLEND_SOFT _CASCADE_BLEND_DITHER
             // GPU instancing:CPU收集每个对象的'transformation and material properties',并以数组形式发送到GPU,GPU迭代数组元素,并按顺序进行渲染.
             // 该指令告诉Unity为Shader生成两种变体,一种支持GPU instancing,另一种不支持.[通过Inspector面板设置]
             #pragma multi_compile_instancing
@@ -45,6 +54,23 @@ Shader "Custom RP/Lit" {
             #include "LitPass.hlsl" // 将HLSL代码放在一个单独的文件中.
 			ENDHLSL
         }
+
+        Pass {
+			Tags {
+				"LightMode" = "ShadowCaster" // DrawShadows(另见:RenderDirectionalShadows)要求'Material'要有'ShadowCaster pass'.
+			}
+
+			ColorMask 0 // 渲染阴影只需要写入深度,因此禁止颜色数据.
+
+			HLSLPROGRAM
+			#pragma target 3.5
+			#pragma shader_feature _CLIPPING
+			#pragma multi_compile_instancing
+			#pragma vertex ShadowCasterPassVertex
+			#pragma fragment ShadowCasterPassFragment
+			#include "ShadowCasterPass.hlsl"
+			ENDHLSL
+		}
 
 	}
 

@@ -23,7 +23,8 @@ public partial class CameraRenderer
         lighting = new Lighting();
     }
 
-    public void Render(ScriptableRenderContext context, Camera camera, bool useDynamicBatching, bool useGPUInstancing)
+    public void Render(ScriptableRenderContext context, Camera camera, bool useDynamicBatching,
+        bool useGPUInstancing, ShadowSettings shadowSettings)
     {
         this.context = context;
         this.camera = camera;
@@ -31,7 +32,12 @@ public partial class CameraRenderer
         PrepareBuffer();
         PrepareForSceneWindow();
 
-        if (!Cull()) return;
+        if (!Cull(shadowSettings.maxDistance)) return;
+
+        buffer.BeginSample(SampleName);
+        ExecuteBuffer();
+        lighting.Setup(context, cullingResults, shadowSettings);
+        buffer.EndSample(SampleName);
 
         // 传递当前摄像机的属性.
         // 例如:视图投影矩阵(view-projection matrix) = 视图矩阵(view matrix) * 投影矩阵(projection matrix).
@@ -46,14 +52,14 @@ public partial class CameraRenderer
         CameraClearFlags flags = camera.clearFlags;
         buffer.ClearRenderTarget(flags <= CameraClearFlags.Depth, flags <= CameraClearFlags.Color,
             flags == CameraClearFlags.Color ? camera.backgroundColor.linear : Color.clear);
-        buffer.BeginSample(SampleName); // 优化调试
+        buffer.BeginSample(SampleName); // 优化调试,在frame debugger中显示层次结构.
         ExecuteBuffer();
-
-        lighting.Setup(context, cullingResults);
 
         DrawVisibleGeometry(useDynamicBatching, useGPUInstancing);
         DrawUnsupportedShaders();
         DrawGizmos();
+
+        lighting.Cleanup();
 
         buffer.EndSample(SampleName);
         ExecuteBuffer();
@@ -88,10 +94,11 @@ public partial class CameraRenderer
         context.DrawRenderers(cullingResults, ref drawingSettings, ref filteringSettings);
     }
 
-    private bool Cull()
+    private bool Cull(float maxShadowDistance)
     {
         if (camera.TryGetCullingParameters(out ScriptableCullingParameters p))
         {
+            p.shadowDistance = Mathf.Min(maxShadowDistance, camera.farClipPlane);
             cullingResults = context.Cull(ref p);
             return true;
         }

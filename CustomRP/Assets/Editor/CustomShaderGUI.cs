@@ -5,13 +5,35 @@ using UnityEngine.Rendering;
 
 public class CustomShaderGUI : ShaderGUI
 {
+    enum ShadowMode
+    {
+        On,
+        Clip,
+        Dither,
+        Off
+    }
+
     private MaterialEditor editor; // 负责展示和编辑Materials的底层编辑器对象.
     private Object[] materials; // 正在编辑的Materials对象.
     private MaterialProperty[] properties; // 可被编辑的属性.
     private bool showPresets;
 
+    ShadowMode Shadows
+    {
+        set
+        {
+            if (SetProperty("_Shadows", (float)value))
+            {
+                SetKeyword("_SHADOWS_CLIP", value == ShadowMode.Clip);
+                SetKeyword("_SHADOWS_DITHER", value == ShadowMode.Dither);
+            }
+        }
+    }
+
     public override void OnGUI(MaterialEditor materialEditor, MaterialProperty[] properties)
     {
+        EditorGUI.BeginChangeCheck();
+
         base.OnGUI(materialEditor, properties); // 调用基类方法,最终会显示默认的Shader面板.
         editor = materialEditor;
         materials = materialEditor.targets;
@@ -25,6 +47,11 @@ public class CustomShaderGUI : ShaderGUI
             ClipPreset();
             FadePreset();
             TransparentPreset();
+        }
+
+        if (EditorGUI.EndChangeCheck())
+        {
+            SetShadowCasterPass();
         }
     }
 
@@ -68,6 +95,21 @@ public class CustomShaderGUI : ShaderGUI
     bool HasProperty(string name) => ShaderGUI.FindProperty(name, properties, false) != null;
 
     bool HasPremultiplyAlpha => HasProperty("_PremulAlpha");
+
+    void SetShadowCasterPass()
+    {
+        MaterialProperty shadows = FindProperty("_Shadows", properties, false);
+        if (shadows == null || shadows.hasMixedValue)
+        {
+            return;
+        }
+        bool enabled = shadows.floatValue < (float)ShadowMode.Off;
+        foreach (Material m in materials)
+        {
+            // 支持对所有使用这个'Material'的所有'shadow caster'关闭shadow.而不用手动一个个关闭'MeshRender'中的'cast shadows'.
+            m.SetShaderPassEnabled("ShadowCaster", enabled);
+        }
+    }
 
     bool Clipping
     {

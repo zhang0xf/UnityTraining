@@ -1,5 +1,5 @@
-#ifndef CUSTOM_UNLIT_PASS_INCLUDED // 防止重复包含
-#define CUSTOM_UNLIT_PASS_INCLUDED
+#ifndef CUSTOM_SHADOW_CASTER_PASS_INCLUDED
+#define CUSTOM_SHADOW_CASTER_PASS_INCLUDED
 
 #include "../ShaderLibrary/Common.hlsl"
 
@@ -19,49 +19,54 @@ SAMPLER(sampler_BaseMap); // 纹理采样器(控制如何采样纹理)
 // 注意:'batch size'会根据目标平台以及每个Instance需要提供多少数据而不同.如果超出限制,会导致不止一个批处理.
 UNITY_INSTANCING_BUFFER_START(UnityPerMaterial)
     UNITY_DEFINE_INSTANCED_PROP(float4, _BaseMap_ST) // 该变量提供纹理的'tiling and offset',应该声明在buff中,即能够按'per-instance'设置.
-    UNITY_DEFINE_INSTANCED_PROP(float4, _BaseColor)
-    UNITY_DEFINE_INSTANCED_PROP(float, _Cutoff)
+	UNITY_DEFINE_INSTANCED_PROP(float4, _BaseColor) // 在渲染阴影时,只负责利用Alpha值进行裁剪(clipping).['_BaseMap_ST'也一样]
+	UNITY_DEFINE_INSTANCED_PROP(float, _Cutoff)
 UNITY_INSTANCING_BUFFER_END(UnityPerMaterial)
 
 struct Attributes {
 	float3 positionOS : POSITION; // Object Space Position.
-    float2 baseUV : TEXCOORD0; // 纹理坐标是顶点属性(vertex Attributes)中的一部分,'TEXCOORD0'表示第一对坐标.
+    float2 baseUV : TEXCOORD0; // 纹理坐标是顶点属性(vertex data)中的一部分,'TEXCOORD0'表示第一对坐标.
     UNITY_VERTEX_INPUT_INSTANCE_ID // 当使用'GPU Instancing'时,对象索引(Object Index)可以从顶点数据中获取.
 };
 
 struct Varyings {
-	float4 positionCS : SV_POSITION; // 齐次裁剪空间坐标(Homogeneous Clip Space Position).
+	float4 positionCS : SV_POSITION; // Homogeneous(齐次) Clip(裁剪) Space Position.
     float2 baseUV : VAR_BASE_UV; // 该变量用于传递纹理坐标,'VAR_BASE_UV'不是特定语义,而是任意未使用的标识符,用来赋予变量含义.
 	UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
-Varyings UnlitPassVertex(Attributes input) 
+Varyings ShadowCasterPassVertex(Attributes input)
 {
     Varyings output;
     UNITY_SETUP_INSTANCE_ID(input);
     UNITY_TRANSFER_INSTANCE_ID(input, output);
     float3 positionWS = TransformObjectToWorld(input.positionOS);
     output.positionCS = TransformWorldToHClip(positionWS);
+
+    // 当产生阴影的物体(shadow caster)完全位于近裁剪面一侧,进而导致阴影也被裁剪的情况,所以需要将这些'Vertex position''clamp'到近裁剪面.
+    #if UNITY_REVERSED_Z
+        output.positionCS.z = min(output.positionCS.z, output.positionCS.w * UNITY_NEAR_CLIP_VALUE);
+    #else
+        output.positionCS.z = max(output.positionCS.z, output.positionCS.w * UNITY_NEAR_CLIP_VALUE);
+    #endif
+
     float4 baseST = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _BaseMap_ST);
 	output.baseUV = input.baseUV * baseST.xy + baseST.zw;
     return output;
 }
 
-// 返回值类型float4:颜色(R,G,B,A)
-// 延伸:如果正在针对手游进行优化,尽可能使用half替代float.原则上positions和'texture coordinates'可以使用float,其余的使用half.
-// 非手游平台,精度通常不是问题.即使你使用了half,大部分GPU也会使用float.
-// 语义SV_TARGET:float4只是一个数据,可能代表着任何含义,具体的语义需要由函数自身指示(SV_TARGET).
-// 延伸:关于着色器语义,另见:https://docs.unity.cn/cn/2020.3/Manual/SL-ShaderSemantics.html
-float4 UnlitPassFragment(Varyings input) : SV_TARGET
+void ShadowCasterPassFragment (Varyings input) // 渲染阴影时,片元函数不需要返回任何值.
 {
     UNITY_SETUP_INSTANCE_ID(input);
     float4 baseMap = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.baseUV); // 采样纹理
 	float4 baseColor = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _BaseColor);
     float4 base = baseMap * baseColor;
-    #if defined(_CLIPPING)
+    #if defined(_SHADOWS_CLIP)
         clip(base.a - UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _Cutoff));
+    #elif defined(_SHADOWS_DITHER)
+		float dither = InterleavedGradientNoise(input.positionCS.xy, 0);
+		clip(base.a - dither);
     #endif
-	return base;
 }
 
 #endif

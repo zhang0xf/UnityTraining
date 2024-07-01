@@ -9,13 +9,16 @@ public class Lighting
 
     private readonly CommandBuffer buffer;
     private CullingResults cullingResults;
+    private readonly Shadows shadows;
 
     private readonly static int dirLightCountId = Shader.PropertyToID("_DirectionalLightCount");
     private readonly static int dirLightColorsId = Shader.PropertyToID("_DirectionalLightColors");
     private readonly static int dirLightDirectionsId = Shader.PropertyToID("_DirectionalLightDirections");
+    private readonly static int dirLightShadowDataId = Shader.PropertyToID("_DirectionalLightShadowData");
 
     private readonly static Vector4[] dirLightColors = new Vector4[maxDirLightCount];
     private readonly static Vector4[] dirLightDirections = new Vector4[maxDirLightCount];
+    private readonly static Vector4[] dirLightShadowData = new Vector4[maxDirLightCount];
 
     public Lighting()
     {
@@ -23,13 +26,17 @@ public class Lighting
         {
             name = bufferName
         };
+
+        shadows = new Shadows();
     }
 
-    public void Setup(ScriptableRenderContext context, CullingResults cullingResults)
+    public void Setup(ScriptableRenderContext context, CullingResults cullingResults, ShadowSettings shadowSettings)
     {
         this.cullingResults = cullingResults;
         buffer.BeginSample(bufferName);
+        shadows.Setup(context, cullingResults, shadowSettings);
         SetupLights();
+        shadows.Render();
         buffer.EndSample(bufferName);
         context.ExecuteCommandBuffer(buffer);
         buffer.Clear();
@@ -54,11 +61,18 @@ public class Lighting
         buffer.SetGlobalInt(dirLightCountId, visibleLights.Length); // 发送到GPU
         buffer.SetGlobalVectorArray(dirLightColorsId, dirLightColors);
         buffer.SetGlobalVectorArray(dirLightDirectionsId, dirLightDirections);
+        buffer.SetGlobalVectorArray(dirLightShadowDataId, dirLightShadowData);
     }
 
     void SetupDirectionalLight(int index, ref VisibleLight visibleLight)
     {
         dirLightColors[index] = visibleLight.finalColor;
         dirLightDirections[index] = -visibleLight.localToWorldMatrix.GetColumn(2); // 矩阵的第3列
+        dirLightShadowData[index] = shadows.ReserveDirectionalShadows(visibleLight.light, index);
+    }
+
+    public void Cleanup()
+    {
+        shadows.Cleanup();
     }
 }

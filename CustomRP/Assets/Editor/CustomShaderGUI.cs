@@ -53,6 +53,21 @@ public class CustomShaderGUI : ShaderGUI
         {
             SetShadowCasterPass();
         }
+
+        BakedEmission();
+    }
+
+    void BakedEmission()
+    {
+        EditorGUI.BeginChangeCheck();
+        editor.LightmapEmissionProperty(); // 显示配置选项:启用或关闭'baking of emission per material'.
+        if (EditorGUI.EndChangeCheck())
+        {
+            foreach (Material m in editor.targets)
+            {
+                m.globalIlluminationFlags &= ~MaterialGlobalIlluminationFlags.EmissiveIsBlack;
+            }
+        }
     }
 
     void SetProperty(string name, string keyword, bool value)

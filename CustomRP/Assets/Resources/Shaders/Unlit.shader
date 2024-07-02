@@ -2,7 +2,7 @@ Shader "Custom RP/Unlit" {
 	
 	Properties {
         _BaseMap("Texture", 2D) = "white" {}
-        _BaseColor("Color", Color) = (1.0, 1.0, 1.0, 1.0)
+        [HDR] _BaseColor("Color", Color) = (1.0, 1.0, 1.0, 1.0)
         _Cutoff ("Alpha Cutoff", Range(0.0, 1.0)) = 0.5 // Alpha剔除阈值
         [Toggle(_CLIPPING)] _Clipping ("Alpha Clipping", Float) = 0
         [Enum(UnityEngine.Rendering.BlendMode)] _SrcBlend ("Src Blend", Float) = 1 // One:全部
@@ -11,6 +11,11 @@ Shader "Custom RP/Unlit" {
     }
 	
 	SubShader {
+
+        HLSLINCLUDE
+		#include "../ShaderLibrary/Common.hlsl"
+		#include "UnlitInput.hlsl"
+		ENDHLSL
 		
 		Pass {
             // Blend SrcAlpha OneMinusSrcAlpha // Traditional transparency
@@ -36,6 +41,22 @@ Shader "Custom RP/Unlit" {
             #include "UnlitPass.hlsl" // 将HLSL代码放在一个单独的文件中.
 			ENDHLSL
         }
+
+        // Unity使用一个特殊的'meta pass'来决定'Bake light'时的反射光颜色.
+        Pass {
+			Tags {
+				"LightMode" = "Meta"
+			}
+
+			Cull Off // This pass requires culling to always be off
+
+			HLSLPROGRAM
+			#pragma target 3.5
+			#pragma vertex MetaPassVertex
+			#pragma fragment MetaPassFragment
+			#include "MetaPass.hlsl"
+			ENDHLSL
+		}
 
 	}
 

@@ -9,6 +9,8 @@ Shader "Custom RP/Lit" {
         [KeywordEnum(On, Clip, Dither, Off)] _Shadows ("Shadows", Float) = 0 // 是否投射阴影
         _Metallic ("Metallic", Range(0, 1)) = 0
 		_Smoothness ("Smoothness", Range(0, 1)) = 0.5
+        [NoScaleOffset] _EmissionMap("Emission", 2D) = "white" {}
+		[HDR] _EmissionColor("Emission", Color) = (0.0, 0.0, 0.0, 0.0)
         [Toggle(_PREMULTIPLY_ALPHA)] _PremulAlpha ("Premultiply Alpha", Float) = 0
         [Enum(UnityEngine.Rendering.BlendMode)] _SrcBlend ("Src Blend", Float) = 1 // One:全部
 		[Enum(UnityEngine.Rendering.BlendMode)] _DstBlend ("Dst Blend", Float) = 0 // Zero:忽略
@@ -16,6 +18,11 @@ Shader "Custom RP/Lit" {
     }
 	
 	SubShader {
+
+        HLSLINCLUDE
+		#include "../ShaderLibrary/Common.hlsl" // 所有渲染通道(pass)都包含此文件.
+		#include "LitInput.hlsl"
+		ENDHLSL
 		
 		Pass {
             Tags {
@@ -46,6 +53,8 @@ Shader "Custom RP/Lit" {
             // 没有关键字的情况使用下划线(_)表示,即匹配默认的'2×2 filter'.
             #pragma multi_compile _ _DIRECTIONAL_PCF3 _DIRECTIONAL_PCF5 _DIRECTIONAL_PCF7
             #pragma multi_compile _ _CASCADE_BLEND_SOFT _CASCADE_BLEND_DITHER
+            // 如果定义了关键字,会告诉Unity生成一个Shader变体来渲染'lightmapped objects'.下划线(_)代表没有关键字.
+            #pragma multi_compile _ LIGHTMAP_ON
             // GPU instancing:CPU收集每个对象的'transformation and material properties',并以数组形式发送到GPU,GPU迭代数组元素,并按顺序进行渲染.
             // 该指令告诉Unity为Shader生成两种变体,一种支持GPU instancing,另一种不支持.[通过Inspector面板设置]
             #pragma multi_compile_instancing
@@ -69,6 +78,22 @@ Shader "Custom RP/Lit" {
 			#pragma vertex ShadowCasterPassVertex
 			#pragma fragment ShadowCasterPassFragment
 			#include "ShadowCasterPass.hlsl"
+			ENDHLSL
+		}
+
+        // Unity使用一个特殊的'meta pass'来决定'Bake light'时的反射光颜色.
+        Pass {
+			Tags {
+				"LightMode" = "Meta"
+			}
+
+			Cull Off // This pass requires culling to always be off.
+
+			HLSLPROGRAM
+			#pragma target 3.5
+			#pragma vertex MetaPassVertex
+			#pragma fragment MetaPassFragment
+			#include "MetaPass.hlsl"
 			ENDHLSL
 		}
 

@@ -12,16 +12,16 @@
 // CBUFFER_END
 
 // 纹理和采样器属于Shader资源,无法按'per-instance'提供,需要声明在全局范围.
-TEXTURE2D(_BaseMap); // 纹理句柄
-SAMPLER(sampler_BaseMap); // 纹理采样器(控制如何采样纹理)
+// TEXTURE2D(_BaseMap); // 纹理句柄
+// SAMPLER(sampler_BaseMap); // 纹理采样器(控制如何采样纹理)
 
 // GPU Instancing:仅适用于相同'Material'的'Mesh'.另见:https://docs.unity3d.com/Manual/GPUInstancing.html
 // 注意:'batch size'会根据目标平台以及每个Instance需要提供多少数据而不同.如果超出限制,会导致不止一个批处理.
-UNITY_INSTANCING_BUFFER_START(UnityPerMaterial)
-    UNITY_DEFINE_INSTANCED_PROP(float4, _BaseMap_ST) // 该变量提供纹理的'tiling and offset',应该声明在buff中,即能够按'per-instance'设置.
-    UNITY_DEFINE_INSTANCED_PROP(float4, _BaseColor)
-    UNITY_DEFINE_INSTANCED_PROP(float, _Cutoff)
-UNITY_INSTANCING_BUFFER_END(UnityPerMaterial)
+// UNITY_INSTANCING_BUFFER_START(UnityPerMaterial)
+//     UNITY_DEFINE_INSTANCED_PROP(float4, _BaseMap_ST) // 该变量提供纹理的'tiling and offset',应该声明在buff中,即能够按'per-instance'设置.
+//     UNITY_DEFINE_INSTANCED_PROP(float4, _BaseColor)
+//     UNITY_DEFINE_INSTANCED_PROP(float, _Cutoff)
+// UNITY_INSTANCING_BUFFER_END(UnityPerMaterial)
 
 struct Attributes {
 	float3 positionOS : POSITION; // Object Space Position.
@@ -42,8 +42,9 @@ Varyings UnlitPassVertex(Attributes input)
     UNITY_TRANSFER_INSTANCE_ID(input, output);
     float3 positionWS = TransformObjectToWorld(input.positionOS);
     output.positionCS = TransformWorldToHClip(positionWS);
-    float4 baseST = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _BaseMap_ST);
-	output.baseUV = input.baseUV * baseST.xy + baseST.zw;
+    // float4 baseST = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _BaseMap_ST);
+	// output.baseUV = input.baseUV * baseST.xy + baseST.zw;
+    output.baseUV = TransformBaseUV(input.baseUV);
     return output;
 }
 
@@ -55,9 +56,10 @@ Varyings UnlitPassVertex(Attributes input)
 float4 UnlitPassFragment(Varyings input) : SV_TARGET
 {
     UNITY_SETUP_INSTANCE_ID(input);
-    float4 baseMap = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.baseUV); // 采样纹理
-	float4 baseColor = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _BaseColor);
-    float4 base = baseMap * baseColor;
+    // float4 baseMap = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.baseUV); // 采样纹理
+	// float4 baseColor = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _BaseColor);
+    // float4 base = baseMap * baseColor;
+    float4 base = GetBase(input.baseUV);
     #if defined(_CLIPPING)
         clip(base.a - UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _Cutoff));
     #endif

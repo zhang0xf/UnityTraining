@@ -1,11 +1,12 @@
 #ifndef CUSTOM_LIT_PASS_INCLUDED
 #define CUSTOM_LIT_PASS_INCLUDED
 
-#include "../ShaderLibrary/Common.hlsl"
+// #include "../ShaderLibrary/Common.hlsl"
 #include "../ShaderLibrary/Surface.hlsl"
 #include "../ShaderLibrary/Shadows.hlsl"
 #include "../ShaderLibrary/Light.hlsl"
 #include "../ShaderLibrary/BRDF.hlsl"
+#include "../ShaderLibrary/GI.hlsl"
 #include "../ShaderLibrary/Lighting.hlsl"
 
 // 渲染管线批处理(SRP Batcher):在GPU缓存'material properties'以减少CPU和GPU的通信数据量,以及CPU发送这些数据产生的额外负荷.
@@ -17,23 +18,24 @@
 // CBUFFER_END
 
 // 纹理和采样器属于Shader资源,无法按'per-instance'提供,需要声明在全局范围.
-TEXTURE2D(_BaseMap); // 纹理句柄
-SAMPLER(sampler_BaseMap); // 纹理采样器(控制如何采样纹理)
+// TEXTURE2D(_BaseMap); // 纹理句柄
+// SAMPLER(sampler_BaseMap); // 纹理采样器(控制如何采样纹理)
 
 // GPU Instancing:仅适用于相同'Material'的'Mesh'.另见:https://docs.unity3d.com/Manual/GPUInstancing.html
 // 注意:'batch size'会根据目标平台以及每个Instance需要提供多少数据而不同.如果超出限制,会导致不止一个批处理.
-UNITY_INSTANCING_BUFFER_START(UnityPerMaterial)
-    UNITY_DEFINE_INSTANCED_PROP(float4, _BaseMap_ST) // 该变量提供纹理的'tiling and offset',应该声明在buff中,即能够按'per-instance'设置.
-    UNITY_DEFINE_INSTANCED_PROP(float4, _BaseColor)
-    UNITY_DEFINE_INSTANCED_PROP(float, _Cutoff)
-    UNITY_DEFINE_INSTANCED_PROP(float, _Metallic)
-	UNITY_DEFINE_INSTANCED_PROP(float, _Smoothness)
-UNITY_INSTANCING_BUFFER_END(UnityPerMaterial)
+// UNITY_INSTANCING_BUFFER_START(UnityPerMaterial)
+//     UNITY_DEFINE_INSTANCED_PROP(float4, _BaseMap_ST) // 该变量提供纹理的'tiling and offset',应该声明在buff中,即能够按'per-instance'设置.
+//     UNITY_DEFINE_INSTANCED_PROP(float4, _BaseColor)
+//     UNITY_DEFINE_INSTANCED_PROP(float, _Cutoff)
+//     UNITY_DEFINE_INSTANCED_PROP(float, _Metallic)
+// 	UNITY_DEFINE_INSTANCED_PROP(float, _Smoothness)
+// UNITY_INSTANCING_BUFFER_END(UnityPerMaterial)
 
 struct Attributes {
 	float3 positionOS : POSITION; // Object Space Position.
     float3 normalOS : NORMAL; // 表面法线是顶点属性(vertex data)的一部分,和'Position'一样定义在'Object Space'中.
     float2 baseUV : TEXCOORD0; // 纹理坐标是顶点属性(vertex data)中的一部分,'TEXCOORD0'表示第一对坐标.
+    GI_ATTRIBUTE_DATA // 'light map'的UV坐标是顶点属性的一部分.(另见GI.hlsl中宏定义)
     UNITY_VERTEX_INPUT_INSTANCE_ID // 当使用'GPU Instancing'时,对象索引(Object Index)可以从顶点数据中获取.
 };
 
@@ -42,7 +44,8 @@ struct Varyings {
     float3 positionWS : VAR_POSITION; // World Space Surface Position.
     float3 normalWS : VAR_NORMAL; // 照明是逐片元计算的,所以片元函数需要法线信息.并且通常在世界空间(world space)中计算.
     float2 baseUV : VAR_BASE_UV; // 该变量用于传递纹理坐标,'VAR_BASE_UV'不是特定语义,而是任意未使用的标识符,用来赋予变量含义.
-	UNITY_VERTEX_INPUT_INSTANCE_ID
+	GI_VARYINGS_DATA // (另见GI.hlsl中宏定义)
+    UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
 Varyings LitPassVertex(Attributes input)
@@ -50,11 +53,13 @@ Varyings LitPassVertex(Attributes input)
     Varyings output;
     UNITY_SETUP_INSTANCE_ID(input);
     UNITY_TRANSFER_INSTANCE_ID(input, output);
+    TRANSFER_GI_DATA(input, output); // (另见GI.hlsl中宏定义)
     output.positionWS = TransformObjectToWorld(input.positionOS);
     output.positionCS = TransformWorldToHClip(output.positionWS);
     output.normalWS = TransformObjectToWorldNormal(input.normalOS);
-    float4 baseST = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _BaseMap_ST);
-	output.baseUV = input.baseUV * baseST.xy + baseST.zw;
+    // float4 baseST = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _BaseMap_ST);
+	// output.baseUV = input.baseUV * baseST.xy + baseST.zw;
+    output.baseUV = TransformBaseUV(input.baseUV);
     return output;
 }
 
@@ -66,11 +71,13 @@ Varyings LitPassVertex(Attributes input)
 float4 LitPassFragment(Varyings input) : SV_TARGET
 {
     UNITY_SETUP_INSTANCE_ID(input);
-    float4 baseMap = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.baseUV); // 采样纹理
-	float4 baseColor = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _BaseColor);
-    float4 base = baseMap * baseColor;
+    // float4 baseMap = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.baseUV); // 采样纹理
+	// float4 baseColor = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _BaseColor);
+    // float4 base = baseMap * baseColor;
+    float4 base = GetBase(input.baseUV);
     #if defined(_CLIPPING)
-        clip(base.a - UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _Cutoff));
+        // clip(base.a - UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _Cutoff));
+        clip(base.a - GetCutoff(input.baseUV));
     #endif
 
     Surface surface;
@@ -80,8 +87,10 @@ float4 LitPassFragment(Varyings input) : SV_TARGET
     surface.depth = -TransformWorldToView(input.positionWS).z; // 'world space'转换到'view space'.
     surface.color = base.rgb;
 	surface.alpha = base.a;
-    surface.metallic = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _Metallic);
-	surface.smoothness = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _Smoothness);
+    // surface.metallic = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _Metallic);
+    surface.metallic = GetMetallic(input.baseUV);
+	// surface.smoothness = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _Smoothness);
+    surface.smoothness = GetSmoothness(input.baseUV);
     // 给定屏幕空间xy坐标,生成一个旋转的抖动模式的贴片(a rotated tiled dither pattern)
     surface.dither = InterleavedGradientNoise(input.positionCS.xy, 0);
 
@@ -91,8 +100,9 @@ float4 LitPassFragment(Varyings input) : SV_TARGET
 		BRDF brdf = GetBRDF(surface);
 	#endif
 
-    float3 color = GetLighting(surface, brdf);
-
+    GI gi = GetGI(GI_FRAGMENT_DATA(input), surface);
+    float3 color = GetLighting(surface, brdf, gi);
+    color += GetEmission(input.baseUV);
     return float4(color, surface.alpha);
 }
 

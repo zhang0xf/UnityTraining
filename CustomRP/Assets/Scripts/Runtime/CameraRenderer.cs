@@ -80,6 +80,10 @@ public partial class CameraRenderer
         var drawingSettings = new DrawingSettings(unlitShaderTagId, sortingSettings);
         drawingSettings.enableDynamicBatching = useDynamicBatching;
         drawingSettings.enableInstancing = useGPUInstancing;
+        // 对于每一个贡献全局照明(contribute global illuminate)的物体,指示Unity将它们在'light map'中的uv坐标发往Shader.
+        // 用于插值的'light probe'数据也必须按每个物体(per object)发往GPU.
+        // 'Light Probe Proxy Volume'组件(LPPV)也需要发送数据到GPU.[组件可通过物体的Inspector面板添加]
+        drawingSettings.perObjectData = PerObjectData.Lightmaps | PerObjectData.LightProbe | PerObjectData.LightProbeProxyVolume;
         drawingSettings.SetShaderPassName(1, litShaderTagId); // 添加渲染通道
         var filteringSettings = new FilteringSettings(RenderQueueRange.opaque);
         context.DrawRenderers(cullingResults, ref drawingSettings, ref filteringSettings);

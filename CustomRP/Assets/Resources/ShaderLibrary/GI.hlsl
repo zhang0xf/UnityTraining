@@ -4,7 +4,7 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/EntityLighting.hlsl"
 
 #if defined(LIGHTMAP_ON)
-	#define GI_ATTRIBUTE_DATA float2 lightMapUV : TEXCOORD1; // 'light map uv'通过第二个纹理坐标通道提供.
+	#define GI_ATTRIBUTE_DATA float2 lightMapUV : TEXCOORD1; // 第二个纹理坐标通道.
 	#define GI_VARYINGS_DATA float2 lightMapUV : VAR_LIGHT_MAP_UV;
     #define TRANSFER_GI_DATA(input, output) \
 		output.lightMapUV = input.lightMapUV * \
@@ -17,22 +17,22 @@
 	#define GI_FRAGMENT_DATA(input) 0.0
 #endif
 
-TEXTURE2D(unity_Lightmap); // 纹理句柄(light map texture)
-SAMPLER(samplerunity_Lightmap); // 纹理采样器
+TEXTURE2D(unity_Lightmap);
+SAMPLER(samplerunity_Lightmap);
 
-TEXTURE3D_FLOAT(unity_ProbeVolumeSH); // 'LPPV'的'volume data'被存储在'3D float texture'.
-SAMPLER(samplerunity_ProbeVolumeSH); // 纹理采样器
+TEXTURE3D_FLOAT(unity_ProbeVolumeSH); // LPPV
+SAMPLER(samplerunity_ProbeVolumeSH);
 
 struct GI {
-	float3 diffuse; // 间接光照(Indirect light)来自于所有方向,所以只能用作漫反射照明(diffuse lighting),而不能用作高光(specular).
+	float3 diffuse; // 间接光照(Indirect light)来自于所有方向,所以只能用作漫反射照明(diffuse lighting).
 };
 
 float3 SampleLightMap (float2 lightMapUV) {
 	#if defined(LIGHTMAP_ON)
         return SampleSingleLightmap(
 			TEXTURE2D_ARGS(unity_Lightmap, samplerunity_Lightmap), lightMapUV,
-            float4(1.0, 1.0, 0.0, 0.0), // scale and translation to apply.我们已经在之前完成.
-            #if defined(UNITY_LIGHTMAP_FULL_HDR) // 'light map'是否被压缩.
+            float4(1.0, 1.0, 0.0, 0.0),
+            #if defined(UNITY_LIGHTMAP_FULL_HDR)
 				false,
 			#else
 				true,
@@ -45,11 +45,11 @@ float3 SampleLightMap (float2 lightMapUV) {
 }
 
 float3 SampleLightProbe (Surface surfaceWS) {
-	#if defined(LIGHTMAP_ON) // 如果'light map'正在应用于这个物体,则返回0.
+	#if defined(LIGHTMAP_ON) // 如果应用了'light map'则返回.
 		return 0.0;
 	#else
-        if (unity_ProbeVolumeParams.x) {
-			return SampleProbeVolumeSH4( // 使用'LPPV'
+        if (unity_ProbeVolumeParams.x) { // 使用'LPPV'插值.
+			return SampleProbeVolumeSH4( 
 				TEXTURE3D_ARGS(unity_ProbeVolumeSH, samplerunity_ProbeVolumeSH),
 				surfaceWS.position, surfaceWS.normal,
 				unity_ProbeVolumeWorldToObject,
@@ -57,9 +57,9 @@ float3 SampleLightProbe (Surface surfaceWS) {
 				unity_ProbeVolumeMin.xyz, unity_ProbeVolumeSizeInv.xyz
 			);
 		}
-		else {
+		else { // 对'Light Probe'插值.
 			float4 coefficients[7];
-			coefficients[0] = unity_SHAr; // probe data
+			coefficients[0] = unity_SHAr;
 			coefficients[1] = unity_SHAg;
 			coefficients[2] = unity_SHAb;
 			coefficients[3] = unity_SHBr;

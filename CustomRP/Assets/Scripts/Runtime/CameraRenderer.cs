@@ -3,7 +3,7 @@ using UnityEngine.Rendering;
 
 public partial class CameraRenderer
 {
-    private const string bufferName = "Render Camera"; // 在frame debugger工具中显示
+    private const string bufferName = "Render Camera";
 
     private ScriptableRenderContext context;
     private Camera camera;
@@ -11,8 +11,8 @@ public partial class CameraRenderer
     private CullingResults cullingResults;
     private readonly Lighting lighting;
 
-    private static ShaderTagId unlitShaderTagId = new ShaderTagId("SRPDefaultUnlit"); // SRPDefaultUnlit pass(SRP默认渲染通道)
-    private static ShaderTagId litShaderTagId = new ShaderTagId("CustomLit"); // CustomLit pass(渲染通道)
+    private static ShaderTagId unlitShaderTagId = new ShaderTagId("SRPDefaultUnlit"); // SRPDefaultUnlit pass
+    private static ShaderTagId litShaderTagId = new ShaderTagId("CustomLit"); // CustomLit pass
     public CameraRenderer()
     {
         buffer = new CommandBuffer
@@ -80,9 +80,6 @@ public partial class CameraRenderer
         var drawingSettings = new DrawingSettings(unlitShaderTagId, sortingSettings);
         drawingSettings.enableDynamicBatching = useDynamicBatching;
         drawingSettings.enableInstancing = useGPUInstancing;
-        // 对于每一个贡献全局照明(contribute global illuminate)的物体,指示Unity将它们在'light map'中的uv坐标发往Shader.
-        // 用于插值的'light probe'数据也必须按每个物体(per object)发往GPU.
-        // 'Light Probe Proxy Volume'组件(LPPV)也需要发送数据到GPU.[组件可通过物体的Inspector面板添加]
         drawingSettings.perObjectData = PerObjectData.Lightmaps | PerObjectData.LightProbe | PerObjectData.LightProbeProxyVolume;
         drawingSettings.SetShaderPassName(1, litShaderTagId); // 添加渲染通道
         var filteringSettings = new FilteringSettings(RenderQueueRange.opaque);
@@ -91,7 +88,7 @@ public partial class CameraRenderer
         // 渲染天空盒子
         context.DrawSkybox(camera);
 
-        // 渲染透明(transparent)[不写入深度缓冲]
+        // 渲染透明(transparent)
         sortingSettings.criteria = SortingCriteria.CommonTransparent;
         drawingSettings.sortingSettings = sortingSettings;
         filteringSettings.renderQueueRange = RenderQueueRange.transparent;

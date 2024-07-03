@@ -33,11 +33,11 @@ float4 MetaPassFragment (Varyings input) : SV_TARGET {
 	surface.color = base.rgb;
 	surface.metallic = GetMetallic(input.baseUV);
 	surface.smoothness = GetSmoothness(input.baseUV);
-	BRDF brdf = GetBRDF(surface); // 需要知道'surface's diffuse reflectivity',所以需要得到BRDF.
+	BRDF brdf = GetBRDF(surface);
 	float4 meta = 0.0;
     if (unity_MetaFragmentControl.x) {
 		meta = float4(brdf.diffuse, 1.0);
-        meta.rgb += brdf.specular * brdf.roughness * 0.5; // 'highly specular but rough'的材质(Material)也会传递一些间接光.
+        meta.rgb += brdf.specular * brdf.roughness * 0.5; // 高光但粗糙的材质也会传递一些间接光.
         meta.rgb = min(PositivePow(meta.rgb, unity_OneOverOutputBoost), unity_MaxOutputValue);
     }
     else if (unity_MetaFragmentControl.y) {

@@ -44,7 +44,7 @@ public class Lighting
 
     void SetupLights()
     {
-        // NativeArray:可以访问'native memory buffer',在'managed C# code'和'native Unity engine code'之间高效率地分享数据.
+        // NativeArray:在'managed C# code'和'native Unity engine code'之间高效率地分享数据.
         NativeArray<VisibleLight> visibleLights = cullingResults.visibleLights;
 
         int dirLightCount = 0;

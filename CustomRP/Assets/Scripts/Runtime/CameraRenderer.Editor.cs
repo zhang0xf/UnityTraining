@@ -5,7 +5,8 @@ using UnityEngine.Rendering;
 
 partial class CameraRenderer
 {
-    partial void DrawUnsupportedShaders(); // 解决build错误(编译器将删除所有最终没有完整声明的部分方法的调用)
+    // partial:解决构建时调用Editor函数产生的错误.构建时编译器会忽略任何没有定义的函数.
+    partial void DrawUnsupportedShaders();
     partial void DrawGizmos();
     partial void PrepareForSceneWindow();
     partial void PrepareBuffer();
@@ -51,9 +52,9 @@ partial class CameraRenderer
 
     partial void PrepareForSceneWindow()
     {
-        if (camera.cameraType == CameraType.SceneView) // 场景窗口(非游戏窗口)[编辑器]
+        if (camera.cameraType == CameraType.SceneView) // 编辑器场景窗口
         {
-            // 在场景窗口中,UI需要以World Space Mode参加渲染,发送UI到场景视图,这样UI才能在场景窗口中被渲染出来.
+            // 发送UI到场景(在编辑器场景窗口,UI总是以'World Space'模式参加渲染).
             ScriptableRenderContext.EmitWorldGeometryForSceneView(camera);
         }
     }

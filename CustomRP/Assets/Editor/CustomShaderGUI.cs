@@ -13,7 +13,7 @@ public class CustomShaderGUI : ShaderGUI
         Off
     }
 
-    private MaterialEditor editor; // 负责展示和编辑Materials的底层编辑器对象.
+    private MaterialEditor editor;
     private Object[] materials; // 正在编辑的Materials对象.
     private MaterialProperty[] properties; // 可被编辑的属性.
     private bool showPresets;
@@ -34,7 +34,7 @@ public class CustomShaderGUI : ShaderGUI
     {
         EditorGUI.BeginChangeCheck();
 
-        base.OnGUI(materialEditor, properties); // 调用基类方法,最终会显示默认的Shader面板.
+        base.OnGUI(materialEditor, properties); // 调用基类方法,显示默认的Shader面板.
         editor = materialEditor;
         materials = materialEditor.targets;
         this.properties = properties;
@@ -60,7 +60,7 @@ public class CustomShaderGUI : ShaderGUI
     void BakedEmission()
     {
         EditorGUI.BeginChangeCheck();
-        editor.LightmapEmissionProperty(); // 显示配置选项:启用或关闭'baking of emission per material'.
+        editor.LightmapEmissionProperty();
         if (EditorGUI.EndChangeCheck())
         {
             foreach (Material m in editor.targets)
@@ -121,7 +121,7 @@ public class CustomShaderGUI : ShaderGUI
         bool enabled = shadows.floatValue < (float)ShadowMode.Off;
         foreach (Material m in materials)
         {
-            // 支持对所有使用这个'Material'的所有'shadow caster'关闭shadow.而不用手动一个个关闭'MeshRender'中的'cast shadows'.
+            // 关闭/开启所有材质的'ShadowCaster'通道,而无需通过'MeshRender'中的'Cast Shadow'逐一操作.
             m.SetShaderPassEnabled("ShadowCaster", enabled);
         }
     }
@@ -166,7 +166,7 @@ public class CustomShaderGUI : ShaderGUI
     {
         if (GUILayout.Button(name))
         {
-            editor.RegisterPropertyChangeUndo(name); // 应用Preset之前先注册Undo.
+            editor.RegisterPropertyChangeUndo(name);
             return true;
         }
         return false;
